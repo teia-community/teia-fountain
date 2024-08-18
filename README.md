@@ -19,6 +19,8 @@ Requirements:
 - https://developers.google.com/docs/api/quickstart/python
 - A GDC project is used to manage the API access. https://developers.google.com/workspace/guides/create-project
 
+Download the credentials via the Google Cloud Console and store these in the credentials.json file in the root of the project folder.
+
 ## Credentials
 
 You can generate a key and password with tezos-client: ```tezos-client gen keys fountain --encrypted``` Then your key will be in ~/.tezos-client/secret_keys. You can also export a secret key from Temple wallet - Settings > Reveal Private Key.
@@ -35,3 +37,8 @@ python fountain.py
 
 - If you like this project, consider supporting my art - https://teia.art/tz/tz1cTS1WwovU7SC783xgJxZrzr151mcshmNi
 - If you want to donate to help fund the Fountain, send XTZ to **TBA**
+
+Or run with docker compose
+```
+docker compose run --rm fountain
+```
