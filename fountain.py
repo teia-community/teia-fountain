@@ -105,8 +105,6 @@ def run_opg(opg):
             return None
     except KeyError as ke:
         return None
-    finally:
-        sys.exit()
 
 
 def store_balance(service, row_num, balance):
