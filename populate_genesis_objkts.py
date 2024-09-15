@@ -1,17 +1,11 @@
 from pytezos import Key
 from pytezos import pytezos
-from pytezos.rpc.node import RpcError
-from pytezos.operation.result import OperationResult
-from decimal import Decimal
-import datetime
 import os
 import time
 import os.path
 import requests
 from googleapiclient.discovery import build
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
+from google.oauth2 import service_account
 
 # If modifying these scopes, delete the file data/token.json.
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
@@ -39,7 +33,7 @@ def get_genesis(acct_id):
 
 def store_results(service, row_num, objkt_id):
     values = [
-            [ "https://www.hicetnunc.xyz/objkt/%s" % objkt_id ]
+            [ "https://teia.art/objkt/%s" % objkt_id ]
             ]
     body = { 'values': values }
     range_name = 'Form Responses 1!I%s:I%s' % (row_num, row_num)
@@ -54,19 +48,9 @@ def main():
     # The file data/token.json stores the user's access and refresh tokens, and is
     # created automatically when the authorization flow completes for the first
     # time.
-    if os.path.exists('data/token.json'):
-        creds = Credentials.from_authorized_user_file('data/token.json', SCOPES)
-    # If there are no (valid) credentials available, let the user log in.
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES)
-            creds = flow.run_local_server(port=0)
-        # Save the credentials for the next run
-        with open('data/token.json', 'w') as token:
-            token.write(creds.to_json())
+    if os.path.exists('credentials.json'):
+        creds = service_account.Credentials.from_service_account_file(
+            'credentials.json', scopes=SCOPES)
 
     service = build('sheets', 'v4', credentials=creds)
 

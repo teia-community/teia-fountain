@@ -7,11 +7,7 @@ import datetime
 import os
 import time
 import os.path
-import sys
 from googleapiclient.discovery import build
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
-
 from google.oauth2 import service_account
 
 # If modifying these scopes, delete the file data/token.json.
