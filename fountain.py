@@ -21,7 +21,8 @@ FOUNTAIN_SPREADSHEET_ID = '1fcMoCMw44mZvA2qR84Bdxfi90b0AEfINflPdiBqU3kg'
 FOUNTAIN_RANGE_NAME = 'Form Responses 1!A2:I'
 
 # Address: tz1UqhPnVXdPccrVsa5khscwCLHTF2Q2CAer
-key = Key.from_encoded_key(os.environ['TEIA_FOUNTAIN_KEY'], os.environ['TEIA_FOUNTAIN_PASS'])
+key = Key.from_encoded_key(
+    os.environ['TEIA_FOUNTAIN_KEY'], os.environ['TEIA_FOUNTAIN_PASS'])
 pytezos = pytezos.using(shell=os.environ['TEIA_RPC_NODE'], key=key)
 acct_id = pytezos.key.public_key_hash()
 acct = pytezos.account()
@@ -30,7 +31,8 @@ send_amt = os.environ['TEIA_AMOUNT']
 send_to = []
 applied = {}
 
-#print("%s current balance: %s XTZ" % (acct_id, int(acct['balance']) / 1000000) )
+# print("%s current balance: %s XTZ" % (acct_id, int(acct['balance']) / 1000000) )
+
 
 def balance(acct_id):
     try:
@@ -39,6 +41,7 @@ def balance(acct_id):
         print(e)
         return -1
     return int(acct['balance'])
+
 
 def transfer(send_to, send_amt):
     opg = pytezos.transaction(destination=send_to, amount=Decimal(send_amt))
@@ -67,6 +70,8 @@ def transfer(send_to, send_amt):
 # 1 - verified
 # 0 - not found
 # -1 - failure
+
+
 def verify_op(op_hash):
     try:
         # look 5 blocks back for our operation
@@ -80,6 +85,7 @@ def verify_op(op_hash):
             ret = 1
             break
     return ret
+
 
 def run_opg(opg):
     try:
@@ -101,32 +107,35 @@ def run_opg(opg):
     finally:
         sys.exit()
 
+
 def store_balance(service, row_num, balance):
     processed = '' if balance == 0 else 'Skipped'
     if balance == -1:
         processed = "Invalid Tezos account number"
     values = [
-            [ float(balance) / 1000000, processed ]
-            ]
-    body = { 'values': values }
+        [float(balance) / 1000000, processed]
+    ]
+    body = {'values': values}
     range_name = 'Form Responses 1!F%s:G%s' % (row_num, row_num)
-    #print(range_name)
+    # print(range_name)
     result = service.spreadsheets().values().update(
         spreadsheetId=FOUNTAIN_SPREADSHEET_ID, range=range_name,
         valueInputOption='USER_ENTERED', body=body).execute()
     print('{0} cells updated.'.format(result.get('updatedCells')))
 
+
 def store_results(service, row_num, op_hash):
     values = [
-            [ str(datetime.datetime.now()), "https://tzkt.io/%s" % op_hash ]
-            ]
-    body = { 'values': values }
+        [str(datetime.datetime.now()), "https://tzkt.io/%s" % op_hash]
+    ]
+    body = {'values': values}
     range_name = 'Form Responses 1!G%s:H%s' % (row_num, row_num)
-    #print(range_name)
+    # print(range_name)
     result = service.spreadsheets().values().update(
         spreadsheetId=FOUNTAIN_SPREADSHEET_ID, range=range_name,
         valueInputOption='USER_ENTERED', body=body).execute()
     print('{0} cells updated.'.format(result.get('updatedCells')))
+
 
 def main():
     creds = None
@@ -134,7 +143,8 @@ def main():
     # created automatically when the authorization flow completes for the first
     # time.
     if os.path.exists('data/token.json'):
-        creds = Credentials.from_authorized_user_file('data/token.json', SCOPES)
+        creds = Credentials.from_authorized_user_file(
+            'data/token.json', SCOPES)
     # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
@@ -166,16 +176,19 @@ def main():
             address = row[1].strip()
             approved = row[4] == 'TRUE'
             processed_on = row[6] if len(row) > 6 else ''
-            #print('%s, %s' % (address, approved))
+            # print('%s, %s' % (address, approved))
             if approved and processed_on == '':
                 acct_balance = balance(address)
-                print("%s balance=%0.4f XTZ %s" % (address, acct_balance / 1000000, row_num))
+                print("%s balance=%0.4f XTZ %s" %
+                      (address, acct_balance / 1000000, row_num))
                 # TODO - write balance to sheet
                 store_balance(service, row_num, acct_balance)
                 if acct_balance == 0:
                     op_hash = transfer(address, send_amt)
-                    print('Sent %s to %s with %s' % (send_amt, address, op_hash))
+                    print('Sent %s to %s with %s' %
+                          (send_amt, address, op_hash))
                     store_results(service, row_num, op_hash)
+
 
 if __name__ == '__main__':
     main()
