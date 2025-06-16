@@ -1,3 +1,4 @@
+from discord_webhook import DiscordWebhook
 from pytezos import Key
 from pytezos import pytezos
 from pytezos.rpc.node import RpcError
@@ -14,8 +15,9 @@ from google.oauth2 import service_account
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
 # The ID and range of a sample spreadsheet.
-FOUNTAIN_SPREADSHEET_ID = '1fcMoCMw44mZvA2qR84Bdxfi90b0AEfINflPdiBqU3kg'
+FOUNTAIN_SPREADSHEET_ID = '1VR4EIkpohArT0LZk-0_JI_BVsMeIuxAyAkNTEwSNN8I'
 FOUNTAIN_RANGE_NAME = 'Form Responses 1!A2:I'
+WEBHOOK_URL = os.environ['WEBHOOK_URL']
 
 # Address: tz1UqhPnVXdPccrVsa5khscwCLHTF2Q2CAer
 key = Key.from_encoded_key(
@@ -30,6 +32,9 @@ applied = {}
 
 # print("%s current balance: %s XTZ" % (acct_id, int(acct['balance']) / 1000000) )
 
+def msg(msg):
+    webhook = DiscordWebhook(url=WEBHOOK_URL, content=msg)
+    response = webhook.execute()
 
 def balance(acct_id):
     try:
@@ -117,6 +122,7 @@ def store_balance(service, row_num, balance):
         spreadsheetId=FOUNTAIN_SPREADSHEET_ID, range=range_name,
         valueInputOption='USER_ENTERED', body=body).execute()
     print('{0} cells updated.'.format(result.get('updatedCells')))
+    msg('{0} cells updated.'.format(result.get('updatedCells')))
 
 
 def store_results(service, row_num, op_hash):
@@ -130,6 +136,7 @@ def store_results(service, row_num, op_hash):
         spreadsheetId=FOUNTAIN_SPREADSHEET_ID, range=range_name,
         valueInputOption='USER_ENTERED', body=body).execute()
     print('{0} cells updated.'.format(result.get('updatedCells')))
+    msg('{0} cells updated.'.format(result.get('updatedCells')))
 
 
 def main():
@@ -149,6 +156,7 @@ def main():
     result = sheet.values().get(spreadsheetId=FOUNTAIN_SPREADSHEET_ID,
                                 range=FOUNTAIN_RANGE_NAME).execute()
     values = result.get('values', [])
+    #msg("%s current balance: %s XTZ" % (acct_id, int(acct['balance']) / 1000000) )
 
     if not values:
         print('No data found.')
@@ -158,7 +166,7 @@ def main():
             row_num += 1
             if row[1] == '':
                 break
-            address = row[1].strip()
+            address = row[2].strip()
             approved = row[4] == 'TRUE'
             processed_on = row[6] if len(row) > 6 else ''
             # print('%s, %s' % (address, approved))
@@ -171,6 +179,8 @@ def main():
                 if acct_balance == 0:
                     op_hash = transfer(address, send_amt)
                     print('Sent %s to %s with %s' %
+                          (send_amt, address, op_hash))
+                    msg('Sent %s to %s with %s' %
                           (send_amt, address, op_hash))
                     store_results(service, row_num, op_hash)
 

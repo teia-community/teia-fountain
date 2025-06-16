@@ -5,7 +5,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 USER root
-RUN python -m pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib; \
+RUN python -m pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib discord-webhook; \
     mkdir data; \
     chown pytezos data; \
     apk add curl
