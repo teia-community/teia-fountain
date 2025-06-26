@@ -2,6 +2,7 @@ services:
   fountain:
     build:
       context: .
+    restart: unless-stopped
     volumes:
       - data:/home/pytezos/data
       - ./credentials.json:/home/pytezos/credentials.json
