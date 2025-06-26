@@ -19,7 +19,7 @@ FOUNTAIN_SPREADSHEET_ID = '1VR4EIkpohArT0LZk-0_JI_BVsMeIuxAyAkNTEwSNN8I'
 FOUNTAIN_RANGE_NAME = 'Form Responses 1!A2:I'
 WEBHOOK_URL = os.environ['WEBHOOK_URL']
 
-# Address: tz1UqhPnVXdPccrVsa5khscwCLHTF2Q2CAer
+# Address: tz1NAaEqTBd5WLLZjeGXrLMoxxxGy3tCUTQg
 key = Key.from_encoded_key(
     os.environ['TEIA_FOUNTAIN_KEY'], os.environ['TEIA_FOUNTAIN_PASS'])
 pytezos = pytezos.using(shell=os.environ['TEIA_RPC_NODE'], key=key)
@@ -29,8 +29,7 @@ acct = pytezos.account()
 send_amt = os.environ['TEIA_AMOUNT']
 send_to = []
 applied = {}
-
-# print("%s current balance: %s XTZ" % (acct_id, int(acct['balance']) / 1000000) )
+retry_seconds = 300
 
 def msg(msg):
     webhook = DiscordWebhook(url=WEBHOOK_URL, content=msg)
@@ -41,7 +40,6 @@ def balance(acct_id):
         acct = pytezos.account(acct_id)
     except RpcError as e:
         print(e)
-        msg(e)
         return -1
     return int(acct['balance'])
 
@@ -136,7 +134,7 @@ def store_results(service, row_num, op_hash):
         spreadsheetId=FOUNTAIN_SPREADSHEET_ID, range=range_name,
         valueInputOption='USER_ENTERED', body=body).execute()
     print('{0} cells updated.'.format(result.get('updatedCells')))
-    msg('{0} cells updated.'.format(result.get('updatedCells')))
+
 
 
 def main():
@@ -148,39 +146,51 @@ def main():
         creds = service_account.Credentials.from_service_account_file(
             'credentials.json', scopes=SCOPES)
 
+    sent_message = False
+    msg('Bot started, running with %s seconds interval' % (retry_seconds))
 
-    service = build('sheets', 'v4', credentials=creds)
+    while True:
+        bot_balance = balance(acct_id)
+        if float(bot_balance / 1000000) < float(send_amt) and not sent_message:
+            sent_message = True
+            print("bot balance too low %0.4f XTZ" % (bot_balance / 1000000))
+            msg("Bot balance too low: %0.4f XTZ" % (bot_balance / 1000000))
 
-    # Call the Sheets API
-    sheet = service.spreadsheets()
-    result = sheet.values().get(spreadsheetId=FOUNTAIN_SPREADSHEET_ID,
-                                range=FOUNTAIN_RANGE_NAME).execute()
-    values = result.get('values', [])
-    #msg("%s current balance: %s XTZ" % (acct_id, int(acct['balance']) / 1000000) )
+        if float(bot_balance / 1000000) >= float(send_amt):
+            sent_message = False
 
-    if not values:
-        print('No data found.')
-    else:
-        row_num = 1
-        for row in values:
-            row_num += 1
-            address = row[2].strip()
-            approved = row[4] == 'TRUE'
-            processed_on = row[6] if len(row) > 6 else ''
-            # print('%s, %s' % (address, approved))
-            if approved and processed_on == '':
-                acct_balance = balance(address)
-                print("%s balance=%0.4f XTZ %s" %
-                      (address, acct_balance / 1000000, row_num))
-                # TODO - write balance to sheet
-                store_balance(service, row_num, acct_balance)
-                if acct_balance == 0:
-                    op_hash = transfer(address, send_amt)
-                    print('Sent %s to %s with %s' %
-                          (send_amt, address, op_hash))
-                    msg('Sent %s to %s with https://tzkt.io/%s' %
-                          (send_amt, address, op_hash))
-                    store_results(service, row_num, op_hash)
+            # Call the Sheets API
+            service = build('sheets', 'v4', credentials=creds)
+            sheet = service.spreadsheets()
+            result = sheet.values().get(spreadsheetId=FOUNTAIN_SPREADSHEET_ID,
+                                        range=FOUNTAIN_RANGE_NAME).execute()
+            values = result.get('values', [])
+
+            if not values:
+                print('No data found.')
+            else:
+                row_num = 1
+                for row in values:
+                    row_num += 1
+                    address = row[2].strip()
+                    approved = row[4] == 'TRUE'
+                    processed_on = row[6] if len(row) > 6 else ''
+                    # print('%s, %s' % (address, approved))
+                    if approved and processed_on == '':
+                        acct_balance = balance(address)
+                        # TODO - write balance to sheet
+                        store_balance(service, row_num, acct_balance)
+                        if acct_balance == 0:
+                            op_hash = transfer(address, send_amt)
+                            print('Sent %s to %s with %s' %
+                                  (send_amt, address, op_hash))
+                            msg('Sent %s to %s with <https://tzkt.io/%s>' %
+                                  (send_amt, address, op_hash))
+                            store_results(service, row_num, op_hash)
+                        else:
+                            msg('Did not send %s to %s, already has %s XTZ' %
+                                  (send_amt, address, acct_balance))
+        time.sleep(retry_seconds)
 
 
 if __name__ == '__main__':
