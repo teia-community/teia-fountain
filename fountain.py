@@ -164,8 +164,6 @@ def main():
         row_num = 1
         for row in values:
             row_num += 1
-            if row[1] == '':
-                break
             address = row[2].strip()
             approved = row[4] == 'TRUE'
             processed_on = row[6] if len(row) > 6 else ''
