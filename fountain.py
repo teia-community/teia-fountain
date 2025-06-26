@@ -41,6 +41,7 @@ def balance(acct_id):
         acct = pytezos.account(acct_id)
     except RpcError as e:
         print(e)
+        msg(e)
         return -1
     return int(acct['balance'])
 
@@ -122,7 +123,6 @@ def store_balance(service, row_num, balance):
         spreadsheetId=FOUNTAIN_SPREADSHEET_ID, range=range_name,
         valueInputOption='USER_ENTERED', body=body).execute()
     print('{0} cells updated.'.format(result.get('updatedCells')))
-    msg('{0} cells updated.'.format(result.get('updatedCells')))
 
 
 def store_results(service, row_num, op_hash):
@@ -178,7 +178,7 @@ def main():
                     op_hash = transfer(address, send_amt)
                     print('Sent %s to %s with %s' %
                           (send_amt, address, op_hash))
-                    msg('Sent %s to %s with %s' %
+                    msg('Sent %s to %s with https://tzkt.io/%s' %
                           (send_amt, address, op_hash))
                     store_results(service, row_num, op_hash)
 
