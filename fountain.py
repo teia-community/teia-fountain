@@ -147,7 +147,8 @@ def main():
             'credentials.json', scopes=SCOPES)
 
     sent_message = False
-    msg('Bot started, running with %s seconds interval' % (retry_seconds))
+    bot_balance = balance(acct_id)
+    msg('Bot started, running with %s seconds interval. Current balance: %s XTZ' % (retry_seconds, bot_balance / 1000000))
 
     while True:
         bot_balance = balance(acct_id)
