@@ -1,6 +1,6 @@
+import json
 from discord_webhook import DiscordWebhook
-from pytezos import Key
-from pytezos import pytezos
+from pytezos import Key, pytezos
 from pytezos.rpc.node import RpcError
 from pytezos.operation.result import OperationResult
 from decimal import Decimal
@@ -29,11 +29,22 @@ acct = pytezos.account()
 send_amt = os.environ['TEIA_AMOUNT']
 send_to = []
 applied = {}
-retry_seconds = 300
+retry_seconds = int(os.environ['INTERVAL'])
+state_file = "data/statefile.json"
+
+state = {"filled_rows": 0, "sent_message": False}
+try:
+    with open(state_file, "r") as f:
+        state = json.load(f)
+except FileNotFoundError:
+    with open(state_file, "w") as f:
+        json.dump(state, f)
+
 
 def msg(msg):
     webhook = DiscordWebhook(url=WEBHOOK_URL, content=msg)
-    response = webhook.execute()
+    webhook.execute()
+
 
 def balance(acct_id):
     try:
@@ -136,6 +147,21 @@ def store_results(service, row_num, op_hash):
     print('{0} cells updated.'.format(result.get('updatedCells')))
 
 
+def save_state(state):
+    with open(state_file, "w") as f:
+        json.dump(state, f)
+
+
+def bot_has_enough_balance(bot_balance, send_amt):
+    if float(bot_balance / 1000000) < float(send_amt):
+        if not state.get('sent_message'):
+            state['sent_message'] = True
+            print("bot balance too low %0.4f XTZ" % (bot_balance / 1000000))
+            msg("Bot balance too low: %0.4f XTZ" % (bot_balance / 1000000))
+        return False
+    state['sent_message'] = False
+    return True
+
 
 def main():
     creds = None
@@ -146,51 +172,52 @@ def main():
         creds = service_account.Credentials.from_service_account_file(
             'credentials.json', scopes=SCOPES)
 
-    sent_message = False
     bot_balance = balance(acct_id)
-    msg('Bot started, running with %s seconds interval. Current balance: %s XTZ' % (retry_seconds, bot_balance / 1000000))
+    msg('Bot started, running with %s seconds interval. Current balance: %s XTZ' % (
+        retry_seconds, bot_balance / 1000000))
 
     while True:
         bot_balance = balance(acct_id)
-        if float(bot_balance / 1000000) < float(send_amt) and not sent_message:
-            sent_message = True
-            print("bot balance too low %0.4f XTZ" % (bot_balance / 1000000))
-            msg("Bot balance too low: %0.4f XTZ" % (bot_balance / 1000000))
 
-        if float(bot_balance / 1000000) >= float(send_amt):
-            sent_message = False
+        # Call the Sheets API
+        service = build('sheets', 'v4', credentials=creds)
+        sheet = service.spreadsheets()
+        result = sheet.values().get(spreadsheetId=FOUNTAIN_SPREADSHEET_ID,
+                                    range=FOUNTAIN_RANGE_NAME).execute()
+        values = result.get('values', [])
 
-            # Call the Sheets API
-            service = build('sheets', 'v4', credentials=creds)
-            sheet = service.spreadsheets()
-            result = sheet.values().get(spreadsheetId=FOUNTAIN_SPREADSHEET_ID,
-                                        range=FOUNTAIN_RANGE_NAME).execute()
-            values = result.get('values', [])
-
+        if bot_has_enough_balance(bot_balance, send_amt):
             if not values:
                 print('No data found.')
             else:
                 row_num = 1
                 for row in values:
                     row_num += 1
-                    address = row[2].strip()
-                    approved = row[4] == 'TRUE'
-                    processed_on = row[6] if len(row) > 6 else ''
-                    # print('%s, %s' % (address, approved))
-                    if approved and processed_on == '':
-                        acct_balance = balance(address)
-                        # TODO - write balance to sheet
-                        store_balance(service, row_num, acct_balance)
-                        if acct_balance == 0:
-                            op_hash = transfer(address, send_amt)
-                            print('Sent %s to %s with %s' %
-                                  (send_amt, address, op_hash))
-                            msg('Sent %s to %s with <https://tzkt.io/%s>' %
-                                  (send_amt, address, op_hash))
-                            store_results(service, row_num, op_hash)
+                    if row and row[0].strip():
+                        address = row[2].strip()
+                        approved = row[4] == 'TRUE'
+                        processed_on = row[6] if len(row) > 6 else ''
+                        link = row[3].strip()
+                        # print('%s, %s' % (address, approved))
+                        if approved and processed_on == '':
+                            acct_balance = balance(address)
+                            # TODO - write balance to sheet
+                            store_balance(service, row_num, acct_balance)
+                            if acct_balance == 0:
+                                op_hash = transfer(address, send_amt)
+                                print('Sent %s to %s with %s' %
+                                      (send_amt, address, op_hash))
+                                msg('Sent %s to %s details: <https://tzkt.io/%s>' %
+                                    (send_amt, address, op_hash))
+                                store_results(service, row_num, op_hash)
+                            else:
+                                msg('Did not send %s to %s, already has %s XTZ' %
+                                    (send_amt, address, acct_balance / 1000000))
                         else:
-                            msg('Did not send %s to %s, already has %s XTZ' %
-                                  (send_amt, address, acct_balance))
+                            if row_num > state.get('filled_rows') + 1:
+                                msg('New entry on the form: `%s`. Proof link: <%s>' % (address, link))
+                                state['filled_rows'] += 1
+        save_state(state)
         time.sleep(retry_seconds)
 
 
