@@ -1,6 +1,7 @@
 import json
 from discord_webhook import DiscordWebhook
 from pytezos import Key, pytezos
+from pytezos.crypto.encoding import is_address
 from pytezos.rpc.node import RpcError
 from pytezos.operation.result import OperationResult
 from decimal import Decimal
@@ -200,22 +201,30 @@ def main():
                         link = row[3].strip()
                         # print('%s, %s' % (address, approved))
                         if approved and processed_on == '':
-                            acct_balance = balance(address)
-                            # TODO - write balance to sheet
-                            store_balance(service, row_num, acct_balance)
-                            if acct_balance == 0:
+                            address_is_valid = False
+                            if is_address(address):
+                                address_is_valid = True
+                                acct_balance = balance(address)
+                                # TODO - write balance to sheet
+                                store_balance(service, row_num, acct_balance)
+
+                            if address_is_valid and acct_balance == 0:
                                 op_hash = transfer(address, send_amt)
                                 print('Sent %s to %s with %s' %
                                       (send_amt, address, op_hash))
                                 msg('Sent %s to %s details: <https://tzkt.io/%s>' %
                                     (send_amt, address, op_hash))
                                 store_results(service, row_num, op_hash)
+                            elif not address_is_valid:
+                                store_results(service, row_num,
+                                              'invalid_address')
                             else:
                                 msg('Did not send %s to %s, already has %s XTZ' %
                                     (send_amt, address, acct_balance / 1000000))
                         else:
-                            if row_num > state.get('filled_rows') + 1:
-                                msg('New entry on the form: `%s`. Proof link: <%s>' % (address, link))
+                            if row_num > state.get('filled_rows'):
+                                msg('New entry on the form: `%s`. Proof link: <%s>' % (
+                                    address, link))
                                 state['filled_rows'] += 1
         save_state(state)
         time.sleep(retry_seconds)

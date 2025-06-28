@@ -8,6 +8,12 @@ services:
       - ./credentials.json:/home/pytezos/credentials.json
     env_file:
       - .env
+    networks:
+      - indexer
 
 volumes:
   data:
+
+networks:
+  indexer:
+    external: true
