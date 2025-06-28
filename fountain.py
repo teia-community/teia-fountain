@@ -216,6 +216,8 @@ def main():
                                     (send_amt, address, op_hash))
                                 store_results(service, row_num, op_hash)
                             elif not address_is_valid:
+                                msg('Ignored invalid address: `%s`' %
+                                    (address))
                                 store_results(service, row_num,
                                               'invalid_address')
                             else:
