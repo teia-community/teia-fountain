@@ -43,7 +43,12 @@ except FileNotFoundError:
 
 
 def msg(msg):
-    webhook = DiscordWebhook(url=WEBHOOK_URL, content=msg)
+    allowed_mentions = {
+        # Zir0h and scott
+        "users": ["741913967257190520", "651141634301362218"]
+    }
+    webhook = DiscordWebhook(url=WEBHOOK_URL, content=msg,
+                             allowed_mentions=allowed_mentions)
     webhook.execute()
 
 
@@ -174,18 +179,22 @@ def main():
             'credentials.json', scopes=SCOPES)
 
     bot_balance = balance(acct_id)
-    msg('Bot started, running with %s seconds interval. Current balance: %s XTZ' % (
+    print('Bot started, running with %s seconds interval. Current balance: %s XTZ' % (
         retry_seconds, bot_balance / 1000000))
 
     while True:
-        bot_balance = balance(acct_id)
-
         # Call the Sheets API
         service = build('sheets', 'v4', credentials=creds)
         sheet = service.spreadsheets()
-        result = sheet.values().get(spreadsheetId=FOUNTAIN_SPREADSHEET_ID,
-                                    range=FOUNTAIN_RANGE_NAME).execute()
-        values = result.get('values', [])
+        try:
+            bot_balance = balance(acct_id)
+            result = sheet.values().get(spreadsheetId=FOUNTAIN_SPREADSHEET_ID,
+                                        range=FOUNTAIN_RANGE_NAME).execute()
+            values = result.get('values')
+        except Exception as e:
+            print(e)
+            time.sleep(retry_seconds)
+            break
 
         if bot_has_enough_balance(bot_balance, send_amt):
             if not values:
@@ -221,11 +230,11 @@ def main():
                                 store_results(service, row_num,
                                               'invalid_address')
                             else:
-                                msg('Did not send %s to %s, already has %s XTZ' %
+                                msg('Did not send %s XTZ to <https://tzkt.io/%s>, address already has %s XTZ' %
                                     (send_amt, address, acct_balance / 1000000))
                         else:
                             if row_num > state.get('filled_rows'):
-                                msg('New entry on the form: `%s`. Proof link: <%s>' % (
+                                msg('<@741913967257190520>, <@651141634301362218> New entry on the form: <https://tzkt.io/%s>. Proof link: <%s>' % (
                                     address, link))
                                 state['filled_rows'] += 1
         save_state(state)
